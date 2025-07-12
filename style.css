@@ -328,3 +328,9 @@ input {
     outline: none;
     font-size: 1rem;
 }
+
+/* Remove typing caret for specific headings */
+.no-caret::after {
+    content: none !important;
+    animation: none !important;
+}
