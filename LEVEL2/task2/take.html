@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Take Quiz</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <div class="container" id="quizContainer">
+        <h1 class="typewriter">🎯 Take a Quiz</h1>
+
+        <!-- Quiz List -->
+        <div id="quizListContainer">
+            <h2>📚 Available Quizzes</h2>
+            <div id="quizList" class="quiz-list"></div>
+        </div>
+
+        <!-- Quiz Box -->
+        <div id="quizBox" class="hidden"></div>
+
+        <!-- Result Box -->
+        <div id="resultBox" class="hidden"></div>
+
+        <a href="index.html" class="btn">🏠 Back to Home</a>
+        <button class="btn btn-delete" onclick="logout()">🚪 Logout</button>
+    </div>
+
+    <script>
+        // ✅ Require login
+        const loggedUser = JSON.parse(localStorage.getItem('loggedInUser'));
+        if (!loggedUser) {
+            alert("Please login first.");
+            window.location.href = "login.html";
+        }
+
+        let timer;
+        let timeLeft = 10;
+        let currentQuiz = null;
+        let currentQuestion = 0;
+        let score = 0;
+        let userAnswers = [];
+
+        const quizzes = JSON.parse(localStorage.getItem('quizzes')) || [];
+        const quizListEl = document.getElementById('quizList');
+        const quizBox = document.getElementById('quizBox');
+        const resultBox = document.getElementById('resultBox');
+        const quizListContainer = document.getElementById('quizListContainer');
+
+        function renderQuizList() {
+            quizListEl.innerHTML = "";
+
+            if (quizzes.length === 0) {
+                quizListEl.innerHTML = "<p>No quizzes found. Please create one first.</p>";
+                return;
+            }
+
+            quizzes.forEach((quiz, index) => {
+                const card = document.createElement("div");
+                card.className = "quiz-card";
+
+                card.innerHTML = `
+          <h3>${quiz.title}</h3>
+          <button class="btn" onclick="startQuiz(${index})">🎯 Take Quiz</button>
+          <button class="btn" onclick="editQuiz(${index})">✏️ Edit Quiz</button>
+          <button class="btn btn-delete" onclick="deleteQuiz(${index})">🗑️ Delete</button>
+        `;
+
+                quizListEl.appendChild(card);
+            });
+        }
+
+        function deleteQuiz(index) {
+            quizzes.splice(index, 1);
+            localStorage.setItem("quizzes", JSON.stringify(quizzes));
+            location.reload();
+        }
+
+        function editQuiz(index) {
+            localStorage.setItem("editQuizIndex", index);
+            window.location.href = "create.html";
+        }
+
+        function startQuiz(index) {
+            currentQuiz = quizzes[index];
+            currentQuiz.user = loggedUser.name;
+            currentQuestion = 0;
+            score = 0;
+            userAnswers = [];
+
+            quizListContainer.classList.add("hidden");
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            const qObj = currentQuiz.questions[currentQuestion];
+            timeLeft = 10;
+
+            quizBox.classList.remove("hidden");
+
+            quizBox.innerHTML = `
+        <h2>${currentQuiz.title}</h2>
+        <h3>Q${currentQuestion + 1}: ${qObj.question}</h3>
+        <div class="timer">⏳ Time Left: <span id="time">10</span> sec</div>
+        <div class="options">
+          <button class="btn opt" onclick="checkAnswer('A')">${qObj.options.A}</button>
+          <button class="btn opt" onclick="checkAnswer('B')">${qObj.options.B}</button>
+          <button class="btn opt" onclick="checkAnswer('C')">${qObj.options.C}</button>
+          <button class="btn opt" onclick="checkAnswer('D')">${qObj.options.D}</button>
+        </div>
+      `;
+
+            startTimer();
+        }
+
+        function startTimer() {
+            clearInterval(timer);
+            timer = setInterval(() => {
+                timeLeft--;
+                document.getElementById("time").textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    checkAnswer("None");
+                }
+            }, 1000);
+        }
+
+        function checkAnswer(selected) {
+            clearInterval(timer);
+            const correct = currentQuiz.questions[currentQuestion].answer.toUpperCase().trim();
+
+            userAnswers.push({
+                question: currentQuiz.questions[currentQuestion].question,
+                options: currentQuiz.questions[currentQuestion].options,
+                correct: correct,
+                selected: selected
+            });
+
+            if (selected === correct) score++;
+
+            currentQuestion++;
+            if (currentQuestion < currentQuiz.questions.length) {
+                loadQuestion();
+            } else {
+                showResult();
+            }
+        }
+
+        function showResult() {
+            quizBox.classList.add("hidden");
+            resultBox.classList.remove("hidden");
+
+            let resultHTML = `
+        <h2>🎉 Quiz Completed!</h2>
+        <p>Name: <strong>${currentQuiz.user}</strong></p>
+        <p>Score: <strong>${score}</strong> / ${currentQuiz.questions.length}</p>
+        <hr>
+        <h3>📋 Answer Review:</h3>
+      `;
+
+            userAnswers.forEach((ans, index) => {
+                const isCorrect = ans.selected === ans.correct;
+                resultHTML += `
+          <div class="review-block ${isCorrect ? 'correct' : 'wrong'}">
+            <p><strong>Q${index + 1}:</strong> ${ans.question}</p>
+            <ul>
+              ${Object.entries(ans.options).map(([key, val]) => {
+                    let className = '';
+                    if (key === ans.correct) className = 'correct-answer';
+                    if (key === ans.selected && key !== ans.correct) className = 'wrong-answer';
+                    return `<li class="${className}">${key}: ${val}</li>`;
+                }).join('')}
+            </ul>
+            <p>Your Answer: <strong>${ans.selected}</strong> ${isCorrect ? '✅' : '❌'}</p>
+          </div>
+        `;
+            });
+
+            // Save to leaderboard
+            let leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || [];
+            leaderboard.push({
+                name: currentQuiz.user,
+                quiz: currentQuiz.title,
+                score: score,
+                total: currentQuiz.questions.length,
+                date: new Date().toLocaleString()
+            });
+            localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+
+            // Show top 5 leaderboard
+            const quizLeaderboard = leaderboard
+                .filter(entry => entry.quiz === currentQuiz.title)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 5);
+
+            resultHTML += `
+        <hr>
+        <h3>🏆 Top Scores: ${currentQuiz.title}</h3>
+        <table class="leaderboard-table">
+          <tr>
+            <th>Name</th>
+            <th>Score</th>
+            <th>Date</th>
+          </tr>
+          ${quizLeaderboard.map(entry => `
+            <tr>
+              <td>${entry.name}</td>
+              <td>${entry.score} / ${entry.total}</td>
+              <td>${entry.date}</td>
+            </tr>
+          `).join("")}
+        </table>
+      `;
+
+            resultBox.innerHTML = resultHTML;
+        }
+
+        function logout() {
+            localStorage.removeItem("loggedInUser");
+            window.location.href = "login.html";
+        }
+
+        renderQuizList();
+    </script>
+</body>
+
+</html>

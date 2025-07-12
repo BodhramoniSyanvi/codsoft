@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create Quiz</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="typewriter">📝 Create or Edit Your Quiz</h1>
+
+        <form id="quizForm">
+            <div class="input-group">
+                <label for="quizTitle">Quiz Title</label>
+                <input type="text" id="quizTitle" placeholder="Enter quiz title" required />
+            </div>
+
+            <div id="questionsContainer"></div>
+
+            <button type="button" class="btn" onclick="addQuestion()">➕ Add Question</button>
+            <button type="submit" class="btn">💾 Save Quiz</button>
+        </form>
+
+        <a href="index.html" class="btn">🏠 Back to Home</a>
+    </div>
+
+    <script>
+        let questionCount = 0;
+        let editingIndex = null;
+
+        // Check if we're editing a quiz
+        const editIndex = localStorage.getItem('editQuizIndex');
+        const quizzes = JSON.parse(localStorage.getItem('quizzes')) || [];
+
+        if (editIndex !== null) {
+            editingIndex = parseInt(editIndex);
+            loadQuizForEditing(quizzes[editingIndex]);
+        }
+
+        function loadQuizForEditing(quiz) {
+            document.getElementById('quizTitle').value = quiz.title;
+            quiz.questions.forEach((q, i) => {
+                addQuestion(q);
+            });
+        }
+
+        function addQuestion(existing = null) {
+            questionCount++;
+            const container = document.getElementById('questionsContainer');
+
+            const block = document.createElement("div");
+            block.className = "question-block";
+            block.setAttribute("data-index", questionCount);
+
+            block.innerHTML = `
+        <h3>Question ${questionCount}</h3>
+        <input type="text" placeholder="Enter your question" name="question${questionCount}" value="${existing ? existing.question : ''}" required />
+
+        <div class="options">
+          <input type="text" placeholder="Option A" name="q${questionCount}optA" value="${existing ? existing.options.A : ''}" required />
+          <input type="text" placeholder="Option B" name="q${questionCount}optB" value="${existing ? existing.options.B : ''}" required />
+          <input type="text" placeholder="Option C" name="q${questionCount}optC" value="${existing ? existing.options.C : ''}" required />
+          <input type="text" placeholder="Option D" name="q${questionCount}optD" value="${existing ? existing.options.D : ''}" required />
+        </div>
+
+        <input type="text" placeholder="Correct Answer (A/B/C/D)" name="q${questionCount}ans" value="${existing ? existing.answer : ''}" required />
+
+        <button type="button" class="btn btn-delete" onclick="deleteQuestion(this)">❌ Delete</button>
+      `;
+
+            container.appendChild(block);
+        }
+
+        function deleteQuestion(button) {
+            const block = button.closest('.question-block');
+            block.remove();
+        }
+
+        document.getElementById('quizForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const form = e.target;
+            const quizTitle = form.quizTitle.value.trim();
+            const newQuestions = [];
+
+            const questionBlocks = document.querySelectorAll('.question-block');
+
+            if (questionBlocks.length === 0) {
+                alert("Please add at least one question.");
+                return;
+            }
+
+            questionBlocks.forEach((block) => {
+                const inputs = block.querySelectorAll('input');
+
+                const q = inputs[0].value.trim(); // question
+                const optA = inputs[1].value.trim();
+                const optB = inputs[2].value.trim();
+                const optC = inputs[3].value.trim();
+                const optD = inputs[4].value.trim();
+                const correct = inputs[5].value.trim().toUpperCase();
+
+                newQuestions.push({
+                    question: q,
+                    options: { A: optA, B: optB, C: optC, D: optD },
+                    answer: correct,
+                });
+            });
+
+            const newQuiz = { title: quizTitle, questions: newQuestions };
+
+            const quizzes = JSON.parse(localStorage.getItem("quizzes")) || [];
+
+            const editIndex = localStorage.getItem("editQuizIndex");
+            if (editIndex !== null) {
+                quizzes[parseInt(editIndex)] = newQuiz;
+                localStorage.removeItem("editQuizIndex");
+            } else {
+                quizzes.push(newQuiz);
+            }
+
+            localStorage.setItem("quizzes", JSON.stringify(quizzes));
+
+            alert("✅ Quiz saved successfully!");
+
+            form.reset();
+            document.getElementById("questionsContainer").innerHTML = "";
+        });
+
+    </script>
+</body>
+
+</html>
